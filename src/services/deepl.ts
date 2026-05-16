@@ -1,3 +1,38 @@
+// 翻译服务配置
+export const TRANSLATION_CONFIG = {
+  // 优先使用的翻译服务: 'google' | 'mymemory' | 'mock'
+  preferredService: 'mymemory' as 'google' | 'mymemory' | 'mock',
+  // 是否启用 Google 翻译
+  enableGoogleTranslate: false,
+};
+
+export async function translateWithGoogle(text: string, targetLang: string, sourceLang = 'en'): Promise<string> {
+  console.log('[Google Translate] 翻译到', targetLang);
+  
+  try {
+    // 使用免费的 Google 翻译 API（通过第三方服务）
+    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${sourceLang}&tl=${targetLang}&dt=t&q=${encodeURIComponent(text)}`;
+    const response = await fetch(url);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    
+    const data = await response.json();
+    
+    if (data && data[0] && Array.isArray(data[0])) {
+      const translatedText = data[0].map((item: any) => item[0]).join('');
+      console.log(`[Google Translate] "${text}" -> "${translatedText}"`);
+      return translatedText;
+    } else {
+      throw new Error('Invalid response from Google Translate');
+    }
+  } catch (error) {
+    console.error('[Google Translate] 错误:', error);
+    throw error;
+  }
+}
+
 export async function translateWithMyMemory(text: string, targetLang: string, sourceLang = 'en'): Promise<string> {
   console.log('[MyMemory Translate] 翻译到', targetLang);
   
@@ -32,12 +67,35 @@ export async function translateBatchWithAPI(texts: string[], targetLang: string,
   
   for (const text of texts) {
     let result: string;
+    let serviceUsed = '';
+    
     try {
-      // 尝试使用 MyMemory
-      result = await translateWithMyMemory(text, targetLang, sourceLang);
-    } catch (e) {
-      // 失败时使用模拟翻译
-      console.log('[API] MyMemory失败，使用模拟翻译');
+      if (TRANSLATION_CONFIG.preferredService === 'google' && TRANSLATION_CONFIG.enableGoogleTranslate) {
+        try {
+          result = await translateWithGoogle(text, targetLang, sourceLang);
+          serviceUsed = 'Google';
+        } catch (e) {
+          console.log('[API] Google翻译失败，尝试MyMemory');
+          result = await translateWithMyMemory(text, targetLang, sourceLang);
+          serviceUsed = 'MyMemory';
+        }
+      } else if (TRANSLATION_CONFIG.preferredService === 'mymemory') {
+        try {
+          result = await translateWithMyMemory(text, targetLang, sourceLang);
+          serviceUsed = 'MyMemory';
+        } catch (e) {
+          console.log('[API] MyMemory失败，使用模拟翻译');
+          result = mockTranslateSingle(text, targetLang);
+          serviceUsed = 'Mock';
+        }
+      } else {
+        result = mockTranslateSingle(text, targetLang);
+        serviceUsed = 'Mock';
+      }
+      
+      console.log(`[API] 使用 ${serviceUsed} 翻译: "${text}" -> "${result}"`);
+    } catch (error) {
+      console.error(`[API] 翻译失败 "${text}":`, error);
       result = mockTranslateSingle(text, targetLang);
     }
     results[text] = result;

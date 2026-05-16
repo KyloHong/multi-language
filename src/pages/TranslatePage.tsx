@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Languages, Edit2, Loader2, ChevronLeft, AlertCircle, FileSpreadsheet, CheckCircle2 } from 'lucide-react';
+import { Languages, Edit2, Loader2, ChevronLeft, AlertCircle, FileSpreadsheet, CheckCircle2, Settings, Globe } from 'lucide-react';
 import { useWorkflowStore } from '../store';
 import { getLanguageHeader } from '../services/templateLoader';
-import { translateWithAPI } from '../services/deepl';
+import { translateWithAPI, TRANSLATION_CONFIG, translateWithGoogle, translateWithMyMemory, mockTranslate } from '../services/deepl';
 import { exportToXlsx } from '../services/xlsxExport';
 import { TranslationResult } from '../types';
 
@@ -23,6 +23,8 @@ export const TranslatePage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState({ current: 0, total: 0 });
   const [exporting, setExporting] = useState(false);
+  const [selectedService, setSelectedService] = useState<'google' | 'mymemory' | 'mock'>('mymemory');
+  const [showServiceSelector, setShowServiceSelector] = useState(false);
 
   useEffect(() => {
     if (selectedPlatform && extractedTexts.length > 0 && Object.keys(translations).length === 0) {
@@ -38,6 +40,7 @@ export const TranslatePage: React.FC = () => {
     }
     console.log('[TranslatePage] 选中平台:', selectedPlatform);
     console.log('[TranslatePage] 提取的文本:', extractedTexts);
+    console.log('[TranslatePage] 使用翻译服务:', selectedService);
     
     setIsTranslating(true);
     setError(null);
@@ -53,15 +56,49 @@ export const TranslatePage: React.FC = () => {
     try {
       for (const lang of targetLanguages) {
         const textsToTranslate = extractedTexts.map((t) => t.characters);
-        const results = await translateWithAPI(textsToTranslate, lang);
+        let results: Record<string, string> = {};
+        
+        if (selectedService === 'google') {
+          // 逐个翻译文本
+          for (const text of textsToTranslate) {
+            try {
+              results[text] = await translateWithGoogle(text, lang);
+            } catch (e) {
+              console.warn(`[Google] 翻译失败: "${text}", 尝试 MyMemory`);
+              try {
+                results[text] = await translateWithMyMemory(text, lang);
+              } catch (e2) {
+                console.warn(`[MyMemory] 也失败: "${text}", 使用模拟翻译`);
+                results[text] = mockTranslate([text], lang)[text];
+              }
+            }
+            completedTranslations++;
+            setProgress({ current: completedTranslations, total: totalTranslations });
+          }
+        } else if (selectedService === 'mymemory') {
+          // 使用 MyMemory
+          for (const text of textsToTranslate) {
+            try {
+              results[text] = await translateWithMyMemory(text, lang);
+            } catch (e) {
+              console.warn(`[MyMemory] 翻译失败: "${text}", 使用模拟翻译`);
+              results[text] = mockTranslate([text], lang)[text];
+            }
+            completedTranslations++;
+            setProgress({ current: completedTranslations, total: totalTranslations });
+          }
+        } else {
+          // 使用模拟翻译
+          results = mockTranslate(textsToTranslate, lang);
+          completedTranslations += textsToTranslate.length;
+          setProgress({ current: completedTranslations, total: totalTranslations });
+        }
 
         extractedTexts.forEach((text) => {
           if (!newTranslations[text.id]) {
             newTranslations[text.id] = {};
           }
           newTranslations[text.id][lang] = results[text.characters] || text.characters;
-          completedTranslations++;
-          setProgress({ current: completedTranslations, total: totalTranslations });
         });
       }
 
@@ -115,13 +152,70 @@ export const TranslatePage: React.FC = () => {
   return (
     <div className="max-w-6xl mx-auto">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">多语言翻译</h1>
-        <p className="text-gray-600">
+        <div className="flex items-center justify-between mb-2">
+          <h1 className="text-3xl font-bold text-gray-900">多语言翻译</h1>
+          <button
+            onClick={() => setShowServiceSelector(!showServiceSelector)}
+            className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium transition-colors"
+          >
+            <Settings className="w-4 h-4" />
+            翻译设置
+          </button>
+        </div>
+        
+        <p className="text-gray-600 mb-4">
           为 <span className="font-semibold text-blue-800">{selectedPlatform.name}</span> 生成
           <span className="font-semibold text-cyan-600"> {languages.length} </span>
           种语言的翻译
-          <span className="ml-2 text-yellow-600 text-sm">(使用 Google 翻译)</span>
+          <span className="ml-2 text-yellow-600 text-sm">
+            (当前使用: {selectedService === 'google' ? 'Google 翻译' : selectedService === 'mymemory' ? 'MyMemory' : '模拟翻译'})
+          </span>
         </p>
+        
+        {showServiceSelector && (
+          <div className="mb-4 p-4 bg-gray-50 rounded-xl border border-gray-200">
+            <div className="flex items-center gap-2 mb-3">
+              <Globe className="w-5 h-5 text-gray-600" />
+              <span className="font-medium text-gray-900">选择翻译服务</span>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setSelectedService('google')}
+                className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                  selectedService === 'google'
+                    ? 'bg-blue-600 text-white shadow-md'
+                    : 'bg-white border border-gray-300 hover:border-blue-400'
+                }`}
+              >
+                Google 翻译
+              </button>
+              <button
+                onClick={() => setSelectedService('mymemory')}
+                className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                  selectedService === 'mymemory'
+                    ? 'bg-blue-600 text-white shadow-md'
+                    : 'bg-white border border-gray-300 hover:border-blue-400'
+                }`}
+              >
+                MyMemory
+              </button>
+              <button
+                onClick={() => setSelectedService('mock')}
+                className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                  selectedService === 'mock'
+                    ? 'bg-blue-600 text-white shadow-md'
+                    : 'bg-white border border-gray-300 hover:border-blue-400'
+                }`}
+              >
+                模拟翻译
+              </button>
+            </div>
+            <p className="mt-3 text-xs text-gray-500">
+              提示: Google 翻译质量更高，但可能有访问限制。MyMemory 更稳定但翻译质量稍差。
+            </p>
+          </div>
+        )}
+        
         {Object.keys(translations).length > 0 && (
           <div className="mt-3 flex items-center gap-6 text-sm">
             <span className="text-gray-600">

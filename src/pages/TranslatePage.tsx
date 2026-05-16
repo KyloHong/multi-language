@@ -25,6 +25,7 @@ export const TranslatePage: React.FC = () => {
   const [exporting, setExporting] = useState(false);
   const [selectedService, setSelectedService] = useState<'google' | 'mymemory' | 'mock'>('mymemory');
   const [showServiceSelector, setShowServiceSelector] = useState(false);
+  const [sourceLanguage, setSourceLanguage] = useState<string>('zh-CN');
 
   useEffect(() => {
     if (selectedPlatform && extractedTexts.length > 0 && Object.keys(translations).length === 0) {
@@ -62,11 +63,11 @@ export const TranslatePage: React.FC = () => {
           // 逐个翻译文本
           for (const text of textsToTranslate) {
             try {
-              results[text] = await translateWithGoogle(text, lang);
+              results[text] = await translateWithGoogle(text, lang, sourceLanguage);
             } catch (e) {
               console.warn(`[Google] 翻译失败: "${text}", 尝试 MyMemory`);
               try {
-                results[text] = await translateWithMyMemory(text, lang);
+                results[text] = await translateWithMyMemory(text, lang, sourceLanguage);
               } catch (e2) {
                 console.warn(`[MyMemory] 也失败: "${text}", 使用模拟翻译`);
                 results[text] = mockTranslate([text], lang)[text];
@@ -79,7 +80,7 @@ export const TranslatePage: React.FC = () => {
           // 使用 MyMemory
           for (const text of textsToTranslate) {
             try {
-              results[text] = await translateWithMyMemory(text, lang);
+              results[text] = await translateWithMyMemory(text, lang, sourceLanguage);
             } catch (e) {
               console.warn(`[MyMemory] 翻译失败: "${text}", 使用模拟翻译`);
               results[text] = mockTranslate([text], lang)[text];
@@ -168,47 +169,99 @@ export const TranslatePage: React.FC = () => {
           <span className="font-semibold text-cyan-600"> {languages.length} </span>
           种语言的翻译
           <span className="ml-2 text-yellow-600 text-sm">
-            (当前使用: {selectedService === 'google' ? 'Google 翻译' : selectedService === 'mymemory' ? 'MyMemory' : '模拟翻译'})
+            (源语言: {sourceLanguage === 'zh-CN' ? '简体中文' : sourceLanguage === 'zh-TW' ? '繁体中文' : sourceLanguage === 'en' ? 'English' : '自动检测'} | 
+            当前使用: {selectedService === 'google' ? 'Google 翻译' : selectedService === 'mymemory' ? 'MyMemory' : '模拟翻译'})
           </span>
         </p>
         
         {showServiceSelector && (
           <div className="mb-4 p-4 bg-gray-50 rounded-xl border border-gray-200">
-            <div className="flex items-center gap-2 mb-3">
-              <Globe className="w-5 h-5 text-gray-600" />
-              <span className="font-medium text-gray-900">选择翻译服务</span>
+            <div className="mb-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Globe className="w-5 h-5 text-gray-600" />
+                <span className="font-medium text-gray-900">源语言 (要翻译的语言)</span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => setSourceLanguage('zh-CN')}
+                  className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                    sourceLanguage === 'zh-CN'
+                      ? 'bg-green-600 text-white shadow-md'
+                      : 'bg-white border border-gray-300 hover:border-green-400'
+                  }`}
+                >
+                  简体中文
+                </button>
+                <button
+                  onClick={() => setSourceLanguage('zh-TW')}
+                  className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                    sourceLanguage === 'zh-TW'
+                      ? 'bg-green-600 text-white shadow-md'
+                      : 'bg-white border border-gray-300 hover:border-green-400'
+                  }`}
+                >
+                  繁体中文
+                </button>
+                <button
+                  onClick={() => setSourceLanguage('en')}
+                  className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                    sourceLanguage === 'en'
+                      ? 'bg-green-600 text-white shadow-md'
+                      : 'bg-white border border-gray-300 hover:border-green-400'
+                  }`}
+                >
+                  English
+                </button>
+                <button
+                  onClick={() => setSourceLanguage('auto')}
+                  className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                    sourceLanguage === 'auto'
+                      ? 'bg-green-600 text-white shadow-md'
+                      : 'bg-white border border-gray-300 hover:border-green-400'
+                  }`}
+                >
+                  自动检测
+                </button>
+              </div>
             </div>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setSelectedService('google')}
-                className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${
-                  selectedService === 'google'
-                    ? 'bg-blue-600 text-white shadow-md'
-                    : 'bg-white border border-gray-300 hover:border-blue-400'
-                }`}
-              >
-                Google 翻译
-              </button>
-              <button
-                onClick={() => setSelectedService('mymemory')}
-                className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${
-                  selectedService === 'mymemory'
-                    ? 'bg-blue-600 text-white shadow-md'
-                    : 'bg-white border border-gray-300 hover:border-blue-400'
-                }`}
-              >
-                MyMemory
-              </button>
-              <button
-                onClick={() => setSelectedService('mock')}
-                className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${
-                  selectedService === 'mock'
-                    ? 'bg-blue-600 text-white shadow-md'
-                    : 'bg-white border border-gray-300 hover:border-blue-400'
-                }`}
-              >
-                模拟翻译
-              </button>
+            
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <Settings className="w-5 h-5 text-gray-600" />
+                <span className="font-medium text-gray-900">选择翻译服务</span>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setSelectedService('google')}
+                  className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                    selectedService === 'google'
+                      ? 'bg-blue-600 text-white shadow-md'
+                      : 'bg-white border border-gray-300 hover:border-blue-400'
+                  }`}
+                >
+                  Google 翻译
+                </button>
+                <button
+                  onClick={() => setSelectedService('mymemory')}
+                  className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                    selectedService === 'mymemory'
+                      ? 'bg-blue-600 text-white shadow-md'
+                      : 'bg-white border border-gray-300 hover:border-blue-400'
+                  }`}
+                >
+                  MyMemory
+                </button>
+                <button
+                  onClick={() => setSelectedService('mock')}
+                  className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                    selectedService === 'mock'
+                      ? 'bg-blue-600 text-white shadow-md'
+                      : 'bg-white border border-gray-300 hover:border-blue-400'
+                  }`}
+                >
+                  模拟翻译
+                </button>
+              </div>
             </div>
             <p className="mt-3 text-xs text-gray-500">
               提示: Google 翻译质量更高，但可能有访问限制。MyMemory 更稳定但翻译质量稍差。

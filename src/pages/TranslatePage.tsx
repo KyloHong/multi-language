@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Languages, Edit2, Loader2, ChevronLeft, AlertCircle, FileSpreadsheet, CheckCircle2 } from 'lucide-react';
 import { useWorkflowStore } from '../store';
 import { getLanguageHeader } from '../services/templateLoader';
-import { translateWithGoogle } from '../services/deepl';
+import { translateWithAPI } from '../services/deepl';
 import { exportToXlsx } from '../services/xlsxExport';
 import { TranslationResult } from '../types';
 
@@ -53,7 +53,7 @@ export const TranslatePage: React.FC = () => {
     try {
       for (const lang of targetLanguages) {
         const textsToTranslate = extractedTexts.map((t) => t.characters);
-        const results = await translateWithGoogle(textsToTranslate, lang);
+        const results = await translateWithAPI(textsToTranslate, lang);
 
         extractedTexts.forEach((text) => {
           if (!newTranslations[text.id]) {

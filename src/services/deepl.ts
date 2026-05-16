@@ -1,93 +1,53 @@
-export async function translateWithMyMemory(texts: string[], targetLang: string, sourceLang = 'en'): Promise<Record<string, string>> {
-  console.log('[MyMemory Translate] 翻译', texts.length, '条文本到', targetLang);
-  
-  const results: Record<string, string> = {};
+export async function translateWithMyMemory(text: string, targetLang: string, sourceLang = 'en'): Promise<string> {
+  console.log('[MyMemory Translate] 翻译到', targetLang);
   
   try {
-    // MyMemory使用不同的语言代码格式
     const langPair = `${sourceLang}|${targetLang}`;
+    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${langPair}`;
+    const response = await fetch(url);
     
-    for (const text of texts) {
-      try {
-        const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${langPair}`;
-        const response = await fetch(url);
-        
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
-        }
-        
-        const data = await response.json();
-        
-        if (data.responseStatus === 200 && data.responseData) {
-          results[text] = data.responseData.translatedText;
-          console.log(`[MyMemory] "${text}" -> "${data.responseData.translatedText}"`);
-        } else {
-          console.warn(`[MyMemory] 翻译失败:`, data.responseDetails);
-          results[text] = text;
-        }
-      } catch (err) {
-        console.error(`[MyMemory] Error translating "${text}":`, err);
-        results[text] = text;
-      }
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
     }
     
-    console.log('[MyMemory Translate] 翻译完成');
-    return results;
+    const data = await response.json();
+    
+    if (data.responseStatus === 200 && data.responseData) {
+      console.log(`[MyMemory] "${text}" -> "${data.responseData.translatedText}"`);
+      return data.responseData.translatedText;
+    } else {
+      console.warn(`[MyMemory] 翻译失败:`, data.responseDetails);
+      return text;
+    }
   } catch (error) {
     console.error('[MyMemory Translate] 错误:', error);
     throw error;
   }
 }
 
-export async function translateWithGoogle(texts: string[], targetLang: string, sourceLang = 'en'): Promise<Record<string, string>> {
-  console.log('[Google Translate] 翻译', texts.length, '条文本到', targetLang);
+export async function translateBatchWithAPI(texts: string[], targetLang: string, sourceLang = 'en'): Promise<Record<string, string>> {
+  console.log('[API Translate] 翻译', texts.length, '条文本到', targetLang);
   
   const results: Record<string, string> = {};
   
-  try {
-    const response = await fetch('/api/translate/translate', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        texts,
-        targetLang,
-        sourceLang,
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`翻译API请求失败: ${response.status}`);
-    }
-
-    const data = await response.json();
-    
-    if (data.success) {
-      console.log('[Google Translate] 翻译成功');
-      return data.translations;
-    } else {
-      throw new Error(data.error || '翻译失败');
-    }
-  } catch (error) {
-    console.error('[Google Translate] 翻译错误:', error);
-    // 失败时尝试使用MyMemory
+  for (const text of texts) {
+    let result: string;
     try {
-      console.log('[Google Translate] 尝试使用MyMemory...');
-      return await translateWithMyMemory(texts, targetLang, sourceLang);
-    } catch (myMemoryError) {
-      console.error('[MyMemory] 也失败了，使用模拟翻译');
-      // MyMemory也失败时使用模拟翻译
-      return mockTranslate(texts, targetLang);
+      // 尝试使用 MyMemory
+      result = await translateWithMyMemory(text, targetLang, sourceLang);
+    } catch (e) {
+      // 失败时使用模拟翻译
+      console.log('[API] MyMemory失败，使用模拟翻译');
+      result = mockTranslateSingle(text, targetLang);
     }
+    results[text] = result;
   }
+  
+  console.log('[API Translate] 翻译完成');
+  return results;
 }
 
-export function mockTranslate(texts: string[], targetLang: string): Record<string, string> {
-  console.log('[mockTranslate] 被调用, 目标语言:', targetLang, '文本数:', texts.length);
-  
-  const results: Record<string, string> = {};
-  
+function mockTranslateSingle(text: string, targetLang: string): string {
   const mockTranslations: Record<string, Record<string, string>> = {
     'zh-CN': {
       'Welcome': '欢迎',
@@ -155,28 +115,24 @@ export function mockTranslate(texts: string[], targetLang: string): Record<strin
       'Real-time Updates': 'Actualizaciones en tiempo real',
       'Secure Platform': 'Plataforma segura',
     },
-    'en': {
-      'Welcome': 'Welcome',
-      'Welcome to': 'Welcome to',
-      'IB Portal': 'IB Portal',
-      'Manage your investments with ease': 'Manage your investments with ease',
-      'Get Started': 'Get Started',
-      'Why Choose Us': 'Why Choose Us',
-      'Real-time Updates': 'Real-time Updates',
-      'Secure Platform': 'Secure Platform',
-    },
   };
 
   const langMock = mockTranslations[targetLang] || {};
-  
-  texts.forEach((text) => {
-    if (langMock[text]) {
-      results[text] = langMock[text];
-    } else {
-      results[text] = text;
-    }
-  });
+  return langMock[text] || text;
+}
 
+export function mockTranslate(texts: string[], targetLang: string): Record<string, string> {
+  console.log('[mockTranslate] 被调用, 目标语言:', targetLang, '文本数:', texts.length);
+  
+  const results: Record<string, string> = {};
+  texts.forEach((text) => {
+    results[text] = mockTranslateSingle(text, targetLang);
+  });
+  
   console.log('[mockTranslate] 翻译结果:', results);
   return results;
+}
+
+export async function translateWithAPI(texts: string[], targetLang: string, sourceLang = 'en'): Promise<Record<string, string>> {
+  return await translateBatchWithAPI(texts, targetLang, sourceLang);
 }

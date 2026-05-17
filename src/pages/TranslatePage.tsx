@@ -25,7 +25,7 @@ export const TranslatePage: React.FC = () => {
   const [exporting, setExporting] = useState(false);
   const [selectedService, setSelectedService] = useState<'google' | 'mymemory' | 'mock'>('mymemory');
   const [showServiceSelector, setShowServiceSelector] = useState(false);
-  const [sourceLanguage, setSourceLanguage] = useState<string>('zh-CN');
+  const [sourceLanguage, setSourceLanguage] = useState<string>('auto');
 
   useEffect(() => {
     if (selectedPlatform && extractedTexts.length > 0 && Object.keys(translations).length === 0) {

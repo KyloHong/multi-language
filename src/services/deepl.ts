@@ -37,7 +37,9 @@ export async function translateWithMyMemory(text: string, targetLang: string, so
   console.log('[MyMemory Translate] 翻译到', targetLang);
   
   try {
-    const langPair = `${sourceLang}|${targetLang}`;
+    // 如果是自动检测，我们不传源语言或者用 'en' 作为默认
+    const actualSourceLang = sourceLang === 'auto' ? 'en' : sourceLang;
+    const langPair = `${actualSourceLang}|${targetLang}`;
     const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${langPair}`;
     const response = await fetch(url);
     

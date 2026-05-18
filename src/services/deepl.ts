@@ -1,7 +1,10 @@
+// 导入阿里云翻译
+import { translateWithAliyun, AliyunConfig } from './aliyunTranslate';
+
 // 翻译服务配置
 export const TRANSLATION_CONFIG = {
-  // 优先使用的翻译服务: 'google' | 'mymemory' | 'mock'
-  preferredService: 'mymemory' as 'google' | 'mymemory' | 'mock',
+  // 优先使用的翻译服务: 'google' | 'mymemory' | 'aliyun' | 'mock'
+  preferredService: 'aliyun' as 'google' | 'mymemory' | 'aliyun' | 'mock',
   // 是否启用 Google 翻译
   enableGoogleTranslate: false,
 };
@@ -67,12 +70,32 @@ export async function translateBatchWithAPI(texts: string[], targetLang: string,
   
   const results: Record<string, string> = {};
   
+  // 阿里云翻译配置
+  const aliyunConfig: AliyunConfig = {
+    accessKeyId: import.meta.env.VITE_ALIYUN_ACCESS_KEY_ID || '',
+    accessKeySecret: import.meta.env.VITE_ALIYUN_ACCESS_KEY_SECRET || '',
+    region: import.meta.env.VITE_ALIYUN_REGION || 'cn-hangzhou',
+  };
+  
   for (const text of texts) {
     let result: string;
     let serviceUsed = '';
     
     try {
-      if (TRANSLATION_CONFIG.preferredService === 'google' && TRANSLATION_CONFIG.enableGoogleTranslate) {
+      if (TRANSLATION_CONFIG.preferredService === 'aliyun' && aliyunConfig.accessKeyId && aliyunConfig.accessKeySecret) {
+        try {
+          // 转换语言代码
+          const sourceLangCode = sourceLang === 'auto' ? 'auto' : sourceLang;
+          const targetLangCode = targetLang;
+          
+          result = await translateWithAliyun(text, sourceLangCode, targetLangCode, aliyunConfig);
+          serviceUsed = '阿里云';
+        } catch (e) {
+          console.log('[API] 阿里云翻译失败，尝试MyMemory');
+          result = await translateWithMyMemory(text, targetLang, sourceLang);
+          serviceUsed = 'MyMemory';
+        }
+      } else if (TRANSLATION_CONFIG.preferredService === 'google' && TRANSLATION_CONFIG.enableGoogleTranslate) {
         try {
           result = await translateWithGoogle(text, targetLang, sourceLang);
           serviceUsed = 'Google';

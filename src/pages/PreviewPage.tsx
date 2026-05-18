@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
-import { Search, Edit2, Trash2, FileText, ChevronLeft, ChevronRight, Hash, Tag } from 'lucide-react';
+import { Search, Edit2, Trash2, FileText, ChevronLeft, ChevronRight, Hash, Tag, Download } from 'lucide-react';
 import { useWorkflowStore } from '../store';
+import { exportPreviewToXlsx } from '../services/previewExport';
 
 export const PreviewPage: React.FC = () => {
   const { extractedTexts, setExtractedTexts, goToNextStep, goToPreviousStep } = useWorkflowStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
+  const [downloading, setDownloading] = useState(false);
 
   const uniqueTextsMap = new Map<string, typeof extractedTexts[0]>();
   extractedTexts.forEach((text) => {
@@ -57,10 +59,38 @@ export const PreviewPage: React.FC = () => {
     setEditingId(null);
   };
 
+  const handleDownload = async () => {
+    if (uniqueTexts.length === 0) {
+      alert('没有可下载的文案');
+      return;
+    }
+    
+    setDownloading(true);
+    try {
+      await exportPreviewToXlsx(extractedTexts, 'Figma');
+      alert('下载成功！');
+    } catch (error) {
+      console.error('下载失败:', error);
+      alert('下载失败，请重试');
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   return (
     <div className="max-w-6xl mx-auto">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-1">文案预览</h1>
+        <div className="flex items-center justify-between mb-1">
+          <h1 className="text-2xl font-bold text-gray-900">文案预览</h1>
+          <button
+            onClick={handleDownload}
+            disabled={downloading || uniqueTexts.length === 0}
+            className="px-4 py-2 text-sm font-medium text-blue-800 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Download className="w-4 h-4" />
+            {downloading ? '下载中...' : '下载 XLSX'}
+          </button>
+        </div>
         <p className="text-sm text-gray-500">
           共 {uniqueTexts.length} 条文案
           {uniqueTexts.length !== extractedTexts.length && (
